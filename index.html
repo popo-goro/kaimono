@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="買い物帳">
+<meta name="theme-color" content="#F1F4F2">
+<meta name="robots" content="noindex">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<title>いつもの買い物帳</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#F1F4F2; --surface:#FFFFFF; --ink:#17201B; --muted:#5F6B64; --line:#DCE3DF; --line-strong:#A9B5AE;
+  --accent:#0F7A55; --accent-ink:#FFFFFF; --accent-soft:#DFF0E8;
+  --due:#9A5700; --due-soft:#FBEED6; --due-line:#E9C88E; --done:#98A39D; --danger:#B3261E;
+}
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:"Zen Kaku Gothic New","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",system-ui,sans-serif;font-size:16px;line-height:1.5;-webkit-tap-highlight-color:transparent}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:560px;margin:0 auto;padding-inline:16px;padding-block:0 132px}
+
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:3;background:var(--bg);display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding-block:16px 12px}
+h1{margin:0;font-size:19px;font-weight:700;letter-spacing:.02em}
+.count{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.count b{font-size:24px;color:var(--ink);margin-inline:2px}
+.note{font-size:13px;color:var(--muted);margin:0 0 10px}
+
+.list{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.row{display:flex;align-items:stretch;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+.check{flex:1;display:flex;align-items:center;gap:14px;min-height:58px;padding:10px 4px 10px 16px;background:none;border:0;text-align:left}
+.box{flex:none;width:26px;height:26px;border:2px solid var(--line-strong);border-radius:8px;display:grid;place-items:center;transition:background .15s,border-color .15s}
+.row.done .box{background:var(--accent);border-color:var(--accent)}
+.row.done .box::after{content:"";width:12px;height:6px;border-left:3px solid var(--accent-ink);border-bottom:3px solid var(--accent-ink);transform:translateY(-2px) rotate(-45deg)}
+.name{font-size:18px;font-weight:500;word-break:break-word}
+.row.done .name{color:var(--done);text-decoration:line-through;text-decoration-thickness:2px}
+.off{flex:none;width:52px;background:none;border:0;color:var(--muted);font-size:22px;line-height:1}
+.empty{padding:22px 16px;color:var(--muted);font-size:14px;text-align:center}
+
+.clear{display:block;width:100%;margin-top:10px;min-height:48px;border-radius:12px;border:1px solid var(--accent);background:var(--accent-soft);color:var(--ink);font-weight:700}
+
+section.usual{margin-top:30px}
+.usual-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:4px}
+h2{margin:0;font-size:16px;font-weight:700}
+.tidy{background:none;border:0;color:var(--accent);font-size:14px;padding:6px 0}
+.tidy[aria-pressed="true"]{color:var(--danger)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.tile{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:64px;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;text-align:left}
+.tile .t-name{font-size:16px;font-weight:700;word-break:break-word}
+.tile .t-meta{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tile.due{background:var(--due-soft);border-color:var(--due-line)}
+.tile.due .t-meta{color:var(--due);font-weight:700}
+.tile.example{border-style:dashed}
+.tile.deleting{border-color:var(--danger)}
+.tile.deleting .t-meta{color:var(--danger);font-weight:700}
+.tile .del{position:absolute;top:6px;right:8px;color:var(--danger);font-size:18px;line-height:1}
+
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:4;background:var(--bg);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
+.bar form{max-width:560px;margin:0 auto;display:flex;gap:8px}
+.bar input{flex:1;min-width:0;height:50px;padding:0 14px;border-radius:12px;border:1px solid var(--line-strong);background:var(--surface);font-size:17px}
+.bar button{flex:none;height:50px;padding:0 18px;border-radius:12px;border:0;background:var(--accent);color:var(--accent-ink);font-weight:700}
+
+.toast{position:fixed;left:16px;right:16px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:5;max-width:528px;margin:0 auto;padding:10px 14px;border-radius:10px;background:var(--ink);color:var(--bg);font-size:14px;text-align:center}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>いつもの買い物帳</h1>
+    <div class="count" id="count"></div>
+  </header>
+
+  <ul class="list" id="list" aria-label="買う物"></ul>
+  <button class="clear" id="clear" type="button" hidden></button>
+
+  <section class="usual" aria-labelledby="usual-h">
+    <div class="usual-head">
+      <h2 id="usual-h">いつもの品</h2>
+      <button class="tidy" id="tidy" type="button" aria-pressed="false">整理</button>
+    </div>
+    <p class="note" id="usual-note">押すとリストに入ります。切れそうな物が上に並びます。</p>
+    <div class="grid" id="usual"></div>
+  </section>
+</div>
+
+<div class="bar">
+  <form id="add-form" autocomplete="off">
+    <input id="add-input" type="text" enterkeyhint="done" placeholder="買う物（「、」で区切ると複数）" aria-label="買う物">
+    <button type="submit">追加</button>
+  </form>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+const LOCAL_KEY = 'kaimono-local-v1';
+const EXAMPLES = ['牛乳','卵','食パン','納豆','豆腐','バナナ','トイレットペーパー','洗剤'];
+
+let items = new Map();
+let tidyMode = false;
+let deleteArmed = null;
+
+const $ = s => document.querySelector(s);
+
+function today() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function dayNum(s) { const [y, m, d] = s.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / 86400000); }
+function norm(s) { return s.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' '); }
+function newId() { return 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+function stats(it) {
+  const ds = (it.bought || []).slice().sort();
+  if (!ds.length) return { since: null, avg: null, due: false };
+  const since = dayNum(today()) - dayNum(ds[ds.length - 1]);
+  let avg = null;
+  if (ds.length >= 2) {
+    const a = Math.round((dayNum(ds[ds.length - 1]) - dayNum(ds[0])) / (ds.length - 1));
+    if (a >= 1) avg = a;
+  }
+  const due = avg != null && since >= Math.max(1, Math.round(avg * 0.9));
+  return { since, avg, due };
+}
+
+// ---- storage ----
+function readJSON(key) { try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+function writeJSON(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch (e) {} }
+function persist() { writeJSON(LOCAL_KEY, [...items.values()]); }
+function change(id, patch) {
+  const cur = items.get(id);
+  if (!cur) return;
+  items.set(id, { ...cur, ...patch });
+  persist(id);
+}
+
+// ---- actions ----
+function addNames(text) {
+  const names = text.split(/[、,，\n]/).map(s => s.trim()).filter(Boolean);
+  let added = 0;
+  for (const name of names) {
+    const key = norm(name);
+    const hit = [...items.values()].find(it => norm(it.name) === key);
+    if (hit) {
+      if (!hit.onList) { change(hit.id, { onList: true, checked: false, mark: null, listAt: Date.now() }); added++; }
+    } else {
+      const id = newId();
+      items.set(id, { id, name, onList: true, checked: false, mark: null, bought: [], listAt: Date.now() });
+      persist(id); added++;
+    }
+  }
+  render();
+  return added;
+}
+function toggle(id) {
+  const it = items.get(id);
+  const t = today();
+  const bought = (it.bought || []).slice();
+  if (!it.checked) {
+    let mark = null;
+    if (bought[bought.length - 1] !== t) { bought.push(t); mark = t; }
+    change(id, { checked: true, bought: bought.slice(-8), mark });
+  } else {
+    if (it.mark && bought[bought.length - 1] === it.mark) bought.pop();
+    change(id, { checked: false, bought, mark: null });
+  }
+  render();
+}
+function takeOff(id) {
+  const it = items.get(id);
+  // チェック済みなら買った記録は残す。未チェックなら記録なしで外すだけ
+  change(id, { onList: false, checked: false, mark: null });
+  render();
+  if (!it.checked) toast('「' + it.name + '」をリストから外しました');
+}
+function clearChecked() {
+  const done = [...items.values()].filter(it => it.onList && it.checked);
+  for (const it of done) change(it.id, { onList: false, checked: false, mark: null });
+  render();
+  toast(done.length + '品を片付けました');
+}
+function removeItem(id) {
+  const it = items.get(id);
+  items.delete(id);
+  persist(id);
+  deleteArmed = null;
+  render();
+  toast('「' + it.name + '」を消しました');
+}
+
+// ---- render ----
+function render() {
+  const all = [...items.values()];
+  const onList = all.filter(it => it.onList)
+    .sort((a, b) => (a.checked - b.checked) || ((a.listAt || 0) - (b.listAt || 0)));
+  const left = onList.filter(it => !it.checked).length;
+  const doneN = onList.length - left;
+
+  $('#count').innerHTML = onList.length
+    ? '残り<b>' + left + '</b>品'
+    : '';
+
+  const list = $('#list');
+  list.replaceChildren();
+  if (!onList.length) {
+    const li = document.createElement('li');
+    li.className = 'empty';
+    li.textContent = 'リストは空です。下の欄に書くか、いつもの品を押してください。';
+    list.append(li);
+  }
+  for (const it of onList) {
+    const li = document.createElement('li');
+    li.className = 'row' + (it.checked ? ' done' : '');
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'check';
+    b.setAttribute('aria-pressed', it.checked ? 'true' : 'false');
+    const box = document.createElement('span'); box.className = 'box'; box.setAttribute('aria-hidden', 'true');
+    const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = it.name;
+    b.append(box, nm);
+    b.addEventListener('click', () => toggle(it.id));
+    const x = document.createElement('button');
+    x.type = 'button'; x.className = 'off'; x.textContent = '×';
+    x.setAttribute('aria-label', it.name + 'をリストから外す');
+    x.addEventListener('click', () => takeOff(it.id));
+    li.append(b, x);
+    list.append(li);
+  }
+
+  const clear = $('#clear');
+  clear.hidden = doneN === 0;
+  clear.textContent = '買った物を片付ける（' + doneN + '品）';
+
+  // いつもの品
+  const q = norm($('#add-input').value || '');
+  const usual = all.filter(it => !it.onList && (!q || norm(it.name).includes(q)))
+    .map(it => ({ it, s: stats(it) }))
+    .sort((a, b) => {
+      if (a.s.due !== b.s.due) return a.s.due ? -1 : 1;
+      if (a.s.due) return (b.s.since / b.s.avg) - (a.s.since / a.s.avg);
+      return ((b.it.bought || []).length - (a.it.bought || []).length) || a.it.name.localeCompare(b.it.name, 'ja');
+    });
+
+  const grid = $('#usual');
+  grid.replaceChildren();
+  const noItems = all.length === 0;
+  $('#tidy').hidden = all.filter(it => !it.onList).length === 0;
+  $('#usual-note').textContent = noItems
+    ? '例：押すとリストに入ります。一度買った物は、ここに自動で並びます。'
+    : tidyMode ? '消したい品を押してください（もう一度押すと消えます）。'
+    : q ? '「' + $('#add-input').value.trim() + '」に合う品' : '押すとリストに入ります。切れそうな物が上に並びます。';
+
+  if (noItems) {
+    for (const name of EXAMPLES) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'tile example';
+      const n = document.createElement('span'); n.className = 't-name'; n.textContent = name;
+      b.append(n);
+      b.addEventListener('click', () => addNames(name));
+      grid.append(b);
+    }
+    return;
+  }
+
+  for (const { it, s } of usual) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    const arming = tidyMode && deleteArmed === it.id;
+    b.className = 'tile' + (s.due && !tidyMode ? ' due' : '') + (arming ? ' deleting' : '');
+    const n = document.createElement('span'); n.className = 't-name'; n.textContent = it.name;
+    const m = document.createElement('span'); m.className = 't-meta';
+    if (arming) m.textContent = 'もう一度押すと消えます';
+    else if (s.since == null) m.textContent = 'まだ買っていない';
+    else if (s.due) m.textContent = 'そろそろ · いつも' + s.avg + '日ごと';
+    else m.textContent = (s.since === 0 ? '買ったばかり' : s.since + '日前に買った') + (s.avg ? ' · ' + s.avg + '日ごと' : '');
+    b.append(n, m);
+    if (tidyMode) {
+      const d = document.createElement('span'); d.className = 'del'; d.textContent = '×'; d.setAttribute('aria-hidden', 'true');
+      b.append(d);
+      b.setAttribute('aria-label', it.name + 'を消す');
+    }
+    b.addEventListener('click', () => {
+      if (tidyMode) {
+        if (deleteArmed === it.id) removeItem(it.id);
+        else { deleteArmed = it.id; render(); }
+      } else {
+        change(it.id, { onList: true, checked: false, mark: null, listAt: Date.now() });
+        render();
+      }
+    });
+    grid.append(b);
+  }
+  if (!usual.length) {
+    const p = document.createElement('p');
+    p.className = 'empty'; p.style.gridColumn = '1 / -1';
+    p.textContent = q ? '合う品はありません。「追加」で新しく入ります。' : 'リストの外にある品はありません。';
+    grid.append(p);
+  }
+}
+
+let toastTimer = null;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
+}
+
+// ---- wiring ----
+$('#add-form').addEventListener('submit', e => {
+  e.preventDefault();
+  const inp = $('#add-input');
+  if (!inp.value.trim()) return;
+  const n = addNames(inp.value);
+  inp.value = '';
+  render();
+  if (!n) toast('もうリストに入っています');
+});
+$('#add-input').addEventListener('input', render);
+$('#clear').addEventListener('click', clearChecked);
+$('#tidy').addEventListener('click', () => {
+  tidyMode = !tidyMode; deleteArmed = null;
+  const b = $('#tidy');
+  b.setAttribute('aria-pressed', String(tidyMode));
+  b.textContent = tidyMode ? '整理を終える' : '整理';
+  render();
+});
+document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
+
+items = new Map((readJSON(LOCAL_KEY) || []).map(it => [it.id, it]));
+render();
+// 端末の空き容量が減っても記録を消されにくくする
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+</script>
+</body>
+</html>

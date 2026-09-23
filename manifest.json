@@ -1,0 +1,20 @@
+{
+ "name": "いつもの買い物帳",
+ "short_name": "買い物帳",
+ "start_url": "./",
+ "display": "standalone",
+ "background_color": "#F1F4F2",
+ "theme_color": "#F1F4F2",
+ "icons": [
+  {
+   "src": "icon-180.png",
+   "sizes": "180x180",
+   "type": "image/png"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  }
+ ]
+}
