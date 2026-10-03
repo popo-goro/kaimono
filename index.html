@@ -69,6 +69,7 @@ h2{margin:0;font-size:16px;font-weight:700}
 .tile .del{position:absolute;top:6px;right:8px;color:var(--danger);font-size:18px;line-height:1}
 
 .bar{position:fixed;left:0;right:0;bottom:0;z-index:4;background:var(--bg);border-top:1px solid var(--line);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px))}
+.bar.kb{padding-bottom:10px}
 .bar form{max-width:560px;margin:0 auto;display:flex;gap:8px}
 .bar input{flex:1;min-width:0;height:50px;padding:0 14px;border-radius:12px;border:1px solid var(--line-strong);background:var(--surface);font-size:17px}
 .bar button{flex:none;height:50px;padding:0 18px;border-radius:12px;border:0;background:var(--accent);color:var(--accent-ink);font-weight:700}
@@ -344,6 +345,23 @@ items = new Map((readJSON(LOCAL_KEY) || []).map(it => [it.id, it]));
 render();
 // 端末の空き容量が減っても記録を消されにくくする
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+
+// キーボードが出たら、入力欄をキーボードのすぐ上へ持ち上げる
+(function () {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const bar = document.querySelector('.bar');
+  function placeBar() {
+    const gap = window.innerHeight - vv.height - vv.offsetTop;
+    const open = gap > 60;
+    bar.classList.toggle('kb', open);
+    bar.style.transform = open ? 'translateY(' + (-gap) + 'px)' : '';
+  }
+  vv.addEventListener('resize', placeBar);
+  vv.addEventListener('scroll', placeBar);
+  $('#add-input').addEventListener('blur', () => setTimeout(placeBar, 50));
+  placeBar();
+})();
 </script>
 </body>
 </html>
