@@ -48,6 +48,9 @@ h1{margin:0;font-size:19px;font-weight:700;letter-spacing:.02em}
 .row.done .box::after{content:"";width:12px;height:6px;border-left:3px solid var(--accent-ink);border-bottom:3px solid var(--accent-ink);transform:translateY(-2px) rotate(-45deg)}
 .name{font-size:18px;font-weight:500;word-break:break-word}
 .row.done .name{color:var(--done);text-decoration:line-through;text-decoration-thickness:2px}
+.step{flex:none;display:flex;align-items:center;gap:2px;padding-right:2px}
+.step button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface);font-size:20px;line-height:1;color:var(--ink)}
+.step .n{min-width:30px;text-align:center;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
 .off{flex:none;width:52px;background:none;border:0;color:var(--muted);font-size:22px;line-height:1}
 .empty{padding:22px 16px;color:var(--muted);font-size:14px;text-align:center}
 
@@ -110,6 +113,12 @@ h2{margin:0;font-size:16px;font-weight:700}
 
 <script>
 const LOCAL_KEY = 'kaimono-local-v1';
+// 買った物の送り先（Googleフォーム）。品名・個数・日付を1行ずつ送る
+const FORM = {
+  url: 'https://docs.google.com/forms/d/e/1FAIpQLSerEE43lkPPizkqvf7CKYZcPzPEjzBo1x-CN3RUV4e78KAv6g/formResponse',
+  name: 'entry.2127789330', count: 'entry.1168614203', date: 'entry.447105910',
+};
+const OUTBOX_KEY = 'kaimono-outbox-v1';
 const EXAMPLES = ['牛乳','卵','食パン','納豆','豆腐','バナナ','トイレットペーパー','洗剤'];
 
 let items = new Map();
@@ -126,17 +135,27 @@ function dayNum(s) { const [y, m, d] = s.split('-').map(Number); return Math.rou
 function norm(s) { return s.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' '); }
 function newId() { return 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
+// 買った記録。古い形（日付の文字だけ）は1個として読む
+function entries(it) {
+  return (it.bought || []).map(e => typeof e === 'string' ? { d: e, n: 1 } : e).sort((a, b) => a.d < b.d ? -1 : a.d > b.d ? 1 : 0);
+}
+
+// 買う間隔と個数から、1日あたりの減り方と「そろそろ」を出す
 function stats(it) {
-  const ds = (it.bought || []).slice().sort();
-  if (!ds.length) return { since: null, avg: null, due: false };
-  const since = dayNum(today()) - dayNum(ds[ds.length - 1]);
-  let avg = null;
-  if (ds.length >= 2) {
-    const a = Math.round((dayNum(ds[ds.length - 1]) - dayNum(ds[0])) / (ds.length - 1));
-    if (a >= 1) avg = a;
+  const es = entries(it);
+  if (!es.length) return { since: null, days: null, due: false, ratio: 0 };
+  const last = es[es.length - 1].d;
+  const since = dayNum(today()) - dayNum(last);
+  const span = dayNum(last) - dayNum(es[0].d);
+  let days = null;
+  if (span > 0) {
+    const used = es.filter(e => e.d !== last).reduce((a, e) => a + e.n, 0);
+    const lastN = es.filter(e => e.d === last).reduce((a, e) => a + e.n, 0);
+    const perDay = used / span;
+    if (perDay > 0) days = Math.max(1, Math.round(lastN / perDay));
   }
-  const due = avg != null && since >= Math.max(1, Math.round(avg * 0.9));
-  return { since, avg, due };
+  const due = days != null && since >= Math.max(1, Math.round(days * 0.9));
+  return { since, days, due, ratio: days ? since / days : 0 };
 }
 
 // ---- storage ----
@@ -170,31 +189,76 @@ function addNames(text) {
 }
 function toggle(id) {
   const it = items.get(id);
-  const t = today();
-  const bought = (it.bought || []).slice();
+  const es = entries(it);
   if (!it.checked) {
-    let mark = null;
-    if (bought[bought.length - 1] !== t) { bought.push(t); mark = t; }
-    change(id, { checked: true, bought: bought.slice(-8), mark });
+    es.push({ d: today(), n: 1 });
+    change(id, { checked: true, bought: es.slice(-12), mark: true });
   } else {
-    if (it.mark && bought[bought.length - 1] === it.mark) bought.pop();
-    change(id, { checked: false, bought, mark: null });
+    if (it.mark) es.pop();
+    change(id, { checked: false, bought: es, mark: null });
   }
   render();
 }
+function step(id, delta) {
+  const it = items.get(id);
+  const es = entries(it);
+  if (!it.checked || !it.mark || !es.length) return;
+  es[es.length - 1] = { ...es[es.length - 1], n: Math.max(1, es[es.length - 1].n + delta) };
+  change(id, { bought: es });
+  render();
+}
+// 印を付けた品を片付ける時に、買った記録を送る箱へ入れる
+function shelve(it) {
+  if (it.checked && it.mark) {
+    const e = entries(it).slice(-1)[0];
+    queue({ name: it.name, n: e.n, d: e.d });
+  }
+  change(it.id, { onList: false, checked: false, mark: null });
+}
 function takeOff(id) {
   const it = items.get(id);
-  // チェック済みなら買った記録は残す。未チェックなら記録なしで外すだけ
-  change(id, { onList: false, checked: false, mark: null });
+  shelve(it);
   render();
+  flush();
   if (!it.checked) toast('「' + it.name + '」をリストから外しました');
 }
 function clearChecked() {
   const done = [...items.values()].filter(it => it.onList && it.checked);
-  for (const it of done) change(it.id, { onList: false, checked: false, mark: null });
+  for (const it of done) shelve(it);
   render();
+  flush();
   toast(done.length + '品を片付けました');
 }
+
+// ---- 送る ----
+function queue(row) {
+  const box = readJSON(OUTBOX_KEY) || [];
+  box.push({ ...row, k: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) });
+  writeJSON(OUTBOX_KEY, box);
+}
+let flushing = false;
+async function flush() {
+  if (flushing || !FORM.url) return;
+  flushing = true;
+  let failed = false;
+  try {
+    for (;;) {
+      const box = readJSON(OUTBOX_KEY) || [];
+      if (!box.length) break;
+      const row = box[0];
+      const body = new URLSearchParams();
+      body.set(FORM.name, row.name);
+      body.set(FORM.count, String(row.n));
+      body.set(FORM.date, row.d);
+      try {
+        await fetch(FORM.url, { method: 'POST', mode: 'no-cors', body });
+      } catch (e) { failed = true; break; }
+      writeJSON(OUTBOX_KEY, (readJSON(OUTBOX_KEY) || []).filter(r => r.k !== row.k));
+    }
+  } finally { flushing = false; }
+  if (failed) toast('電波が弱くて記録を送れませんでした。次に開いた時に送ります');
+}
+
 function removeItem(id) {
   const it = items.get(id);
   items.delete(id);
@@ -238,7 +302,22 @@ function render() {
     x.type = 'button'; x.className = 'off'; x.textContent = '×';
     x.setAttribute('aria-label', it.name + 'をリストから外す');
     x.addEventListener('click', () => takeOff(it.id));
-    li.append(b, x);
+    li.append(b);
+    if (it.checked && it.mark) {
+      const n = entries(it).slice(-1)[0].n;
+      const st = document.createElement('div'); st.className = 'step';
+      const minus = document.createElement('button'); minus.type = 'button'; minus.textContent = '−';
+      minus.setAttribute('aria-label', it.name + 'の個数を1つ減らす');
+      minus.addEventListener('click', () => step(it.id, -1));
+      const num = document.createElement('span'); num.className = 'n'; num.textContent = n;
+      num.setAttribute('aria-label', '個数 ' + n);
+      const plus = document.createElement('button'); plus.type = 'button'; plus.textContent = '＋';
+      plus.setAttribute('aria-label', it.name + 'の個数を1つ増やす');
+      plus.addEventListener('click', () => step(it.id, 1));
+      st.append(minus, num, plus);
+      li.append(st);
+    }
+    li.append(x);
     list.append(li);
   }
 
@@ -252,7 +331,7 @@ function render() {
     .map(it => ({ it, s: stats(it) }))
     .sort((a, b) => {
       if (a.s.due !== b.s.due) return a.s.due ? -1 : 1;
-      if (a.s.due) return (b.s.since / b.s.avg) - (a.s.since / a.s.avg);
+      if (a.s.due) return b.s.ratio - a.s.ratio;
       return ((b.it.bought || []).length - (a.it.bought || []).length) || a.it.name.localeCompare(b.it.name, 'ja');
     });
 
@@ -286,8 +365,8 @@ function render() {
     const m = document.createElement('span'); m.className = 't-meta';
     if (arming) m.textContent = 'もう一度押すと消えます';
     else if (s.since == null) m.textContent = 'まだ買っていない';
-    else if (s.due) m.textContent = 'そろそろ · いつも' + s.avg + '日ごと';
-    else m.textContent = (s.since === 0 ? '買ったばかり' : s.since + '日前に買った') + (s.avg ? ' · ' + s.avg + '日ごと' : '');
+    else if (s.due) m.textContent = 'そろそろ · ' + s.since + '日前に買った';
+    else m.textContent = (s.since === 0 ? '買ったばかり' : s.since + '日前に買った') + (s.days ? ' · 約' + s.days + '日もつ' : '');
     b.append(n, m);
     if (tidyMode) {
       const d = document.createElement('span'); d.className = 'del'; d.textContent = '×'; d.setAttribute('aria-hidden', 'true');
@@ -340,10 +419,12 @@ $('#tidy').addEventListener('click', () => {
   b.textContent = tidyMode ? '整理を終える' : '整理';
   render();
 });
-document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { render(); flush(); } });
+window.addEventListener('online', flush);
 
 items = new Map((readJSON(LOCAL_KEY) || []).map(it => [it.id, it]));
 render();
+flush();
 // 端末の空き容量が減っても記録を消されにくくする
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
 
