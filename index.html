@@ -249,7 +249,7 @@ async function flush() {
       const body = new URLSearchParams();
       body.set(FORM.name, row.name);
       body.set(FORM.count, String(row.n));
-      body.set(FORM.date, row.d);
+      body.set(FORM.date, row.d + '#' + row.k);  // 番号付き。途中で閉じて送り直しても表で1行に数える
       try {
         await fetch(FORM.url, { method: 'POST', mode: 'no-cors', body });
       } catch (e) { failed = true; break; }
